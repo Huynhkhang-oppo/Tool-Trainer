@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Thống Kê Báo Cáo FTF & Đấu Trường</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="react">
+        const { useState, useEffect, useRef } = React;
+
+        const removeAccents = (str) => {
+            if (!str) return '';
+            return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+        };
+
+        const cleanShopCode = (code) => {
+            if (code === undefined || code === null) return '';
+            let str = String(code).toUpperCase().replace(/\s+/g, ''); 
+            if (str.endsWith('.0')) {
+                str = str.slice(0, -2);
+            }
+            return str;
+        };
+
+        const TRAINER_DATA = [
+            { khuVuc: "AN GIANG", trainer: "LÊ MINH TRÍ THÀNH", ftfShopMWG: 37, ftfShopOKA: 11, dtHrMWG: 111, dtTranMWG: 1110, dtHrOKA: 18, dtTranOKA: 180 },
+            { khuVuc: "AN GIANG", trainer: "NGUYỄN TRUNG NHÂN", ftfShopMWG: 34, ftfShopOKA: 9, dtHrMWG: 93, dtTranMWG: 930, dtHrOKA: 6, dtTranOKA: 60 },
+            { khuVuc: "CA MAU", trainer: "LẠI ĐĂNG KHOA", ftfShopMWG: 63, ftfShopOKA: 15, dtHrMWG: 93, dtTranMWG: 930, dtHrOKA: 6, dtTranOKA: 60 },
+            { khuVuc: "CA MAU", trainer: "LÊ HOÀNG PHÚC", ftfShopMWG: 46, ftfShopOKA: 19, dtHrMWG: 120, dtTranMWG: 1200, dtHrOKA: 24, dtTranOKA: 240 },
+            { khuVuc: "CAN THO", trainer: "PHẠM MINH ĐỨC", ftfShopMWG: 45, ftfShopOKA: 5, dtHrMWG: 93, dtTranMWG: 930, dtHrOKA: 12, dtTranOKA: 120 },
+            { khuVuc: "CAN THO", trainer: "TRẦN QUANG ĐẠI", ftfShopMWG: 34, ftfShopOKA: 22, dtHrMWG: 90, dtTranMWG: 900, dtHrOKA: 30, dtTranOKA: 300 },
+            { khuVuc: "DONG THAP", trainer: "BÙI TRUNG TÌNH", ftfShopMWG: 28, ftfShopOKA: 8, dtHrMWG: 36, dtTranMWG: 360, dtHrOKA: 9, dtTranOKA: 90 },
+            { khuVuc: "DONG THAP", trainer: "TRẦN HUỲNH KHANG", ftfShopMWG: 40, ftfShopOKA: 10, dtHrMWG: 96, dtTranMWG: 960, dtHrOKA: 18, dtTranOKA: 180 },
+            { khuVuc: "KIEN GIANG", trainer: "NGUYỄN CHÍ HUỲNH", ftfShopMWG: 39, ftfShopOKA: 6, dtHrMWG: 93, dtTranMWG: 930, dtHrOKA: 9, dtTranOKA: 90 },
+            { khuVuc: "KIEN GIANG", trainer: "TRẦN DUY KHANG", ftfShopMWG: 25, ftfShopOKA: 8, dtHrMWG: 84, dtTranMWG: 840, dtHrOKA: 9, dtTranOKA: 90 },
+            { khuVuc: "TIEN GIANG", trainer: "LÊ VIỆT KHÁNH", ftfShopMWG: 71, ftfShopOKA: 15, dtHrMWG: 138, dtTranMWG: 1380, dtHrOKA: 18, dtTranOKA: 180 },
+            { khuVuc: "TIEN GIANG", trainer: "VÕ HỒNG NAM", ftfShopMWG: 53, ftfShopOKA: 10, dtHrMWG: 99, dtTranMWG: 990, dtHrOKA: 12, dtTranOKA: 120 },
+            { khuVuc: "VINH LONG", trainer: "DƯƠNG HOÀI VŨ", ftfShopMWG: 41, ftfShopOKA: 10, dtHrMWG: 87, dtTranMWG: 870, dtHrOKA: 15, dtTranOKA: 150 },
+            { khuVuc: "VINH LONG", trainer: "LÊ HẬU GIANG", ftfShopMWG: 36, ftfShopOKA: 7, dtHrMWG: 69, dtTranMWG: 690, dtHrOKA: 15, dtTranOKA: 150 }
+        ];
+
+        const App = () => {
+            const [formData, setFormData] = useState({
+                trainer: '', khuVuc: '', ngay: new Date().toISOString().split('T')[0],
+                target_ftf_shop_mwg: 0, target_ftf_hr_mwg: 0, target_ftf_shop_oka: 0, target_ftf_hr_oka: 0,
+                target_dt_hr_mwg: 0, target_dt_shop_mwg: 0, target_dt_hr_oka: 0, target_dt_shop_oka: 0,
+                actual_ftf_shop_mwg: 0, actual_ftf_hr_mwg: 0, actual_ftf_shop_oka: 0, actual_ftf_hr_oka: 0,
+                actual_dt_hr_mwg: 0, actual_dt_shop_mwg: 0, actual_dt_hr_oka: 0, actual_dt_shop_oka: 0,
+                reason: ''
+            });
+
+            const [copied, setCopied] = useState(false);
+            
+            const [uploadKeys, setUploadKeys] = useState({ master: 1, ftf: 1, dt: 1 });
+            const [uploadMsgs, setUploadMsgs] = useState({ master: '', ftf: '', dt: '' });
+            
+            const [managedShops, setManagedShops] = useState({});
+            const [configMaster, setConfigMaster] = useState({ shop: 'A', trainer: 'I', channel: 'B' });
+            const [configFtfRaw, setConfigFtfRaw] = useState({ shop: 'A', hr: 'B', status: 'C' }); 
+            const [configDtRaw, setConfigDtRaw] = useState({ shop: 'A', shopName: 'B', matches: 'C', trainer: 'D' });
+            
+            const [showSettingsMaster, setShowSettingsMaster] = useState(false);
+            const [showSettingsFtf, setShowSettingsFtf] = useState(false);
+            const [showSettingsDt, setShowSettingsDt] = useState(false);
+
+            const masterInputRef = useRef(null);
+            const ftfInputRef = useRef(null);
+            const dtInputRef = useRef(null);
+
+            useEffect(() => {
+                lucide.createIcons();
+            });
+
+            const handleTrainerSelect = (e) => {
+                const selectedTrainerName = e.target.value;
+                const trainer = TRAINER_DATA.find(t => t.trainer === selectedTrainerName);
+
+                setManagedShops({}); 
+                setUploadMsgs({ master: '', ftf: '', dt: '' });
+
+                if (trainer) {
+                    setFormData(prev => ({
+                        ...prev, trainer: trainer.trainer, khuVuc: trainer.khuVuc,
+                        target_ftf_shop_mwg: trainer.ftfShopMWG, target_ftf_shop_oka: trainer.ftfShopOKA,
+                        target_dt_hr_mwg: trainer.dtHrMWG, target_dt_shop_mwg: trainer.dtTranMWG, 
+                        target_dt_hr_oka: trainer.dtHrOKA, target_dt_shop_oka: trainer.dtTranOKA,
+                        actual_ftf_shop_mwg: 0, actual_ftf_hr_mwg: 0, actual_ftf_shop_oka: 0, actual_ftf_hr_oka: 0,
+                        actual_dt_hr_mwg: 0, actual_dt_shop_mwg: 0, actual_dt_hr_oka: 0, actual_dt_shop_oka: 0,
+                    }));
+                } else {
+                    setFormData(prev => ({ ...prev, trainer: '' }));
+                }
+            };
+
+            const handleChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const handleColChange = (type, name, value) => {
+                const letter = value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                if (type === 'master') setConfigMaster(prev => ({ ...prev, [name]: letter }));
+                else if (type === 'ftf') setConfigFtfRaw(prev => ({ ...prev, [name]: letter }));
+                else if (type === 'dt') setConfigDtRaw(prev => ({ ...prev, [name]: letter }));
+            };
+
+            const colLetterToIndex = (colLetter) => {
+                if (!colLetter) return -1;
+                let index = 0;
+                for (let i = 0; i < colLetter.length; i++) {
+                    index = index * 26 + (colLetter.charCodeAt(i) - 64);
+                }
+                return index - 1;
+            };
+
+            // BƯỚC 1: XỬ LÝ UPLOAD MASTER
+            const handleMasterUpload = (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+
+                if (!formData.trainer) {
+                    alert("Vui lòng chọn Trainer ở 'Thông tin chung' trước khi tải danh sách Shop!");
+                    setUploadKeys(prev => ({ ...prev, master: prev.master + 1 }));
+                    return;
+                }
+
+                setUploadMsgs(prev => ({ ...prev, master: '⏳ Đang phân tích file...' }));
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const dataBuffer = new Uint8Array(evt.target.result);
+                        const wb = XLSX.read(dataBuffer, {type: 'array'});
+                        const ws = wb.Sheets[wb.SheetNames[0]];
+                        const data = XLSX.utils.sheet_to_json(ws, {header: 1});
+
+                        const shops = {};
+                        const trainerClean = removeAccents(formData.trainer.toUpperCase());
+                        
+                        let shopIdx = colLetterToIndex(configMaster.shop);
+                        let trainerIdx = colLetterToIndex(configMaster.trainer);
+                        let channelIdx = colLetterToIndex(configMaster.channel);
+
+                        // AI Dò Cột Thông Minh
+                        if (data[0]) {
+                            data[0].forEach((col, idx) => {
+                                const colName = removeAccents(String(col).toLowerCase());
+                                if (colName.includes('ma shop') || colName.includes('shop code')) shopIdx = idx;
+                                if (colName.includes('trainer') || colName.includes('nguoi train')) trainerIdx = idx;
+                                if (colName.includes('ten shop') || colName.includes('kenh')) channelIdx = idx;
+                            });
+                        }
+
+                        let count = 0;
+                        const sampleTrainers = new Set();
+                        let lastSeenTrainerMaster = '';
+
+                        for (let i = 0; i < data.length; i++) {
+                            const row = data[i];
+                            if (!row || row.length === 0) continue;
+                            
+                            const shopCode = cleanShopCode(row[shopIdx]);
+                            const rawTrainer = String(row[trainerIdx] || '').trim();
+                            let currentTrainer = rawTrainer || lastSeenTrainerMaster;
+                            
+                            if (rawTrainer) {
+                                lastSeenTrainerMaster = rawTrainer;
+                                if (rawTrainer.length > 3) sampleTrainers.add(rawTrainer);
+                            }
+                            
+                            if (currentTrainer && shopCode) {
+                                const tNameClean = removeAccents(currentTrainer.toUpperCase());
+                                if (tNameClean.includes(trainerClean)) {
+                                    const rawChannelStr = String(row[channelIdx] || '').trim().toUpperCase();
+                                    const channelStr = removeAccents(rawChannelStr);
+                                    
+                                    const isMWG = rawChannelStr.startsWith('TGDĐ') ||
+                                                  rawChannelStr.startsWith('ĐMX') ||
+                                                  channelStr.startsWith('TGDD') || 
+                                                  channelStr.startsWith('DMX') ||
+                                                  channelStr.startsWith('MWG') || 
+                                                  channelStr.startsWith('DIEN MAY XANH') || 
+                                                  channelStr.startsWith('THE GIOI DI DONG');
+                                                  
+                                    shops[shopCode] = isMWG ? 'MWG' : 'OKA';
+                                    count++;
+                                }
+                            }
+                        }
+                        
+                        if (count > 0) {
+                            setManagedShops(shops);
+                            setUploadMsgs(prev => ({ ...prev, master: `✅ Lọc thành công ${count} Shop của ${formData.trainer}.` }));
+                        } else {
+                            setUploadMsgs(prev => ({ ...prev, master: `❌ Lỗi: Không tìm thấy Shop nào!` }));
+                            const sampleT = Array.from(sampleTrainers).slice(0, 3).join(', ') || 'Không tìm thấy';
+                            alert(`⚠️ Không tìm thấy Shop nào của Trainer "${formData.trainer}".\n\nHệ thống đang quét Cột Trainer (${configMaster.trainer}): Thấy tên [${sampleT}...]\n\n👉 Vui lòng nhấn "Cấu hình cột" và sửa lại chữ cái nếu bị sai cột.`);
+                        }
+                    } catch (error) {
+                        setUploadMsgs(prev => ({ ...prev, master: `❌ Lỗi định dạng file.` }));
+                        alert("Có lỗi xảy ra khi đọc file Master. Đảm bảo file không bị hỏng.");
+                    }
+                    setUploadKeys(prev => ({ ...prev, master: prev.master + 1 })); 
+                };
+                reader.readAsArrayBuffer(file);
+            };
+
+            // BƯỚC 2: XỬ LÝ UPLOAD DỮ LIỆU THỰC TẾ (FTF & DT)
+            const handleRawUpload = (e, type) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+
+                const keyType = type.toLowerCase();
+
+                // Check list shop cho FTF
+                if (type === 'FTF' && Object.keys(managedShops).length === 0) {
+                    alert("⚠️ ĐỐI VỚI FTF BẠN CHƯA CÓ DANH SÁCH SHOP! Vui lòng tải Danh sách Shop (Bước 1) trước.");
+                    setUploadKeys(prev => ({ ...prev, [keyType]: prev[keyType] + 1 }));
+                    return;
+                }
+
+                setUploadMsgs(prev => ({ ...prev, [keyType]: '⏳ Đang quét AI tìm dữ liệu...' }));
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const dataBuffer = new Uint8Array(evt.target.result);
+                        const wb = XLSX.read(dataBuffer, {type: 'array'});
+                        const ws = wb.Sheets[wb.SheetNames[0]];
+                        const data = XLSX.utils.sheet_to_json(ws, {header: 1});
+
+                        let matchedRows = 0;
+                        const processedShops = new Set(); 
+                        const allParsedShops = new Set();
+
+                        if (type === 'FTF') {
+                            let shopMWG = 0, hrMWG = 0, shopOKA = 0, hrOKA = 0;
+                            let shopIdx = colLetterToIndex(configFtfRaw.shop);
+                            let hrIdx = colLetterToIndex(configFtfRaw.hr); 
+                            let statusIdx = configFtfRaw.status ? colLetterToIndex(configFtfRaw.status) : -1; 
+                            
+                            // AI Dò Cột Thông Minh
+                            for (let r = 0; r < Math.min(data.length, 15); r++) {
+                                if (!data[r]) continue;
+                                const rowStr = data[r].map(c => removeAccents(String(c).toLowerCase())).join('|');
+                                if (rowStr.includes('shop') || rowStr.includes('train') || rowStr.includes('trang thai') || rowStr.includes('nhan su')) {
+                                    data[r].forEach((col, idx) => {
+                                        const colName = removeAccents(String(col).toLowerCase());
+                                        if (colName.includes('ma shop') || colName === 'shop') shopIdx = idx;
+                                        if (colName.includes('da train') || colName.includes('nhan su') || colName.includes('so luong')) hrIdx = idx;
+                                        if (colName.includes('trang thai') || colName.includes('status')) statusIdx = idx;
+                                    });
+                                    break;
+                                }
+                            }
+
+                            for (let i = 0; i < data.length; i++) {
+                                const row = data[i];
+                                if (!row || row.length === 0) continue;
+
+                                const shopCode = cleanShopCode(row[shopIdx]);
+                                if (!shopCode) continue;
+
+                                if (statusIdx !== -1) {
+                                    const rawStatus = removeAccents(String(row[statusIdx] || '').toLowerCase());
+                                    const isDone = rawStatus.includes('done') || rawStatus.includes('hoan thanh') || rawStatus.includes('pass') || rawStatus.includes('dat') || rawStatus.includes('ok');
+                                    if (!isDone) continue; 
+                                }
+
+                                if (managedShops[shopCode]) {
+                                    matchedRows++;
+                                    const rawHr = row[hrIdx];
+                                    let hr = 0;
+                                    if (rawHr !== undefined && rawHr !== null && String(rawHr).trim() !== '') {
+                                        const num = Number(rawHr);
+                                        if (!isNaN(num)) hr = num;
+                                        else hr = 1; 
+                                    } else hr = 1; 
+
+                                    if (hr > 0) {
+                                        if (managedShops[shopCode] === 'MWG') {
+                                            hrMWG += hr;
+                                            if (!processedShops.has(shopCode)) {
+                                                shopMWG++;
+                                                processedShops.add(shopCode);
+                                            }
+                                        } else {
+                                            hrOKA += hr;
+                                            if (!processedShops.has(shopCode)) {
+                                                shopOKA++;
+                                                processedShops.add(shopCode);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (matchedRows === 0) {
+                                setUploadMsgs(prev => ({ ...prev, ftf: '❌ Không có dữ liệu hợp lệ!' }));
+                                alert(`⚠️ LỖI KHÔNG TÌM THẤY DỮ LIỆU ĐẠT CHUẨN!\n\nLý do có thể:\n- Thiếu cột trạng thái "Done/Hoàn thành".\n- Mã Shop không thuộc danh sách quản lý của bạn.\n👉 Hãy nhấn "Cấu hình cột" kiểm tra lại chữ cái A,B,C.`);
+                            } else {
+                                setFormData(prev => ({
+                                    ...prev, actual_ftf_shop_mwg: shopMWG, actual_ftf_hr_mwg: hrMWG,
+                                    actual_ftf_shop_oka: shopOKA, actual_ftf_hr_oka: hrOKA
+                                }));
+                                setUploadMsgs(prev => ({ ...prev, ftf: `✅ Lọc thành công: ${matchedRows} dòng.` }));
+                            }
+
+                        } else if (type === 'DT') {
+                            let hrPassMWG = 0, matchesMWG = 0, hrPassOKA = 0, matchesOKA = 0;
+                            let shopIdx = colLetterToIndex(configDtRaw.shop);
+                            let shopNameIdx = colLetterToIndex(configDtRaw.shopName);
+                            let matchesIdx = colLetterToIndex(configDtRaw.matches); 
+                            let trainerIdx = configDtRaw.trainer ? colLetterToIndex(configDtRaw.trainer) : -1;
+
+                            let sampleTrainers = new Set();
+                            let lastSeenTrainerDT = ''; 
+
+                            // AI Dò Cột Thông Minh quét sâu 15 dòng
+                            for (let r = 0; r < Math.min(data.length, 15); r++) {
+                                if (!data[r]) continue;
+                                const rowStr = data[r].map(c => removeAccents(String(c).toLowerCase())).join('|');
+                                if (rowStr.includes('shop') || rowStr.includes('tran') || rowStr.includes('trainer') || rowStr.includes('quan ly')) {
+                                    data[r].forEach((col, idx) => {
+                                        const colName = removeAccents(String(col).toLowerCase());
+                                        if (colName.includes('ma shop') || colName === 'shop') shopIdx = idx;
+                                        if (colName.includes('ten shop') || colName.includes('cua hang') || colName.includes('store name')) shopNameIdx = idx;
+                                        if (colName.includes('so tran') || colName.includes('tong tran') || colName.includes('matches')) matchesIdx = idx;
+                                        if (colName.includes('trainer') || colName.includes('quan ly')) trainerIdx = idx;
+                                    });
+                                    break;
+                                }
+                            }
+
+                            const trainerClean = removeAccents((formData.trainer || '').toUpperCase());
+
+                            for (let i = 0; i < data.length; i++) {
+                                const row = data[i];
+                                if (!row || row.length === 0) continue;
+
+                                const shopCode = cleanShopCode(row[shopIdx]);
+
+                                // 1. Lọc theo Trainer (Chống lỗi merge cell)
+                                let isTrainerMatched = true;
+                                if (trainerIdx !== -1) {
+                                    const rawTrainer = String(row[trainerIdx] || '').trim();
+                                    let currentTrainer = rawTrainer || lastSeenTrainerDT;
+                                    
+                                    if (rawTrainer) {
+                                        lastSeenTrainerDT = rawTrainer;
+                                        sampleTrainers.add(rawTrainer);
+                                    }
+                                    
+                                    if (currentTrainer) {
+                                        const tNameCleanRow = removeAccents(currentTrainer.toUpperCase());
+                                        if (!tNameCleanRow.includes(trainerClean)) {
+                                            isTrainerMatched = false;
+                                        }
+                                    } else {
+                                        isTrainerMatched = false; 
+                                    }
+                                }
+
+                                // Bỏ qua nếu Trainer không khớp
+                                if (!isTrainerMatched) continue;
+
+                                // Nếu không có cột Trainer, bắt buộc phải check Mã Shop có nằm trong list Master không
+                                if (trainerIdx === -1 && (!shopCode || !managedShops[shopCode])) {
+                                    continue;
+                                }
+
+                                matchedRows++;
+                                
+                                // 2. Lấy Tổng Số Trận
+                                const rawMatches = row[matchesIdx];
+                                let matches = 0;
+                                if (rawMatches !== undefined && rawMatches !== null && String(rawMatches).trim() !== '') {
+                                    const num = Number(rawMatches);
+                                    if (!isNaN(num)) matches = num;
+                                }
+
+                                // 3. Phân loại Kênh tự động theo Tên Shop
+                                let channel = 'OKA';
+                                const rawShopName = String(row[shopNameIdx] || '').trim().toUpperCase();
+                                
+                                if (rawShopName) {
+                                    const sNameClean = removeAccents(rawShopName);
+                                    // Kênh MWG khi Tên Shop bắt đầu bằng TGDĐ / ĐMX
+                                    if (rawShopName.startsWith('TGDĐ') || rawShopName.startsWith('ĐMX') || 
+                                        sNameClean.startsWith('TGDD') || sNameClean.startsWith('DMX')) {
+                                        channel = 'MWG';
+                                    }
+                                } else if (shopCode && managedShops[shopCode]) {
+                                    // Fallback dùng Master List nếu file không có cột Tên Shop
+                                    channel = managedShops[shopCode];
+                                }
+                                
+                                // 4. Tính toán Sum Tổng Trận & Đếm HR
+                                if (channel === 'MWG') {
+                                    matchesMWG += matches; 
+                                    if (matches >= 10) hrPassMWG += 1; 
+                                } else {
+                                    matchesOKA += matches; 
+                                    if (matches >= 10) hrPassOKA += 1; 
+                                }
+                            }
+
+                            if (matchedRows === 0) {
+                                setUploadMsgs(prev => ({ ...prev, dt: '❌ Không có dữ liệu hợp lệ!' }));
+                                let msg = `⚠️ LỖI KHÔNG TÌM THẤY DỮ LIỆU ĐẤU TRƯỜNG!\n\n`;
+                                if (trainerIdx === -1) {
+                                    msg += `- KHÔNG TÌM THẤY CỘT TRAINER trong file Đấu trường, và Mã Shop cũng không khớp danh sách quản lý của bạn.\n`;
+                                } else {
+                                    const sTrainers = Array.from(sampleTrainers).slice(0, 3).join(', ');
+                                    msg += `- Tool đã quét Cột Trainer, tìm thấy các tên: [${sTrainers}...]\n`;
+                                    msg += `- NHƯNG không có tên nào khớp với Trainer bạn chọn ("${formData.trainer}").\n`;
+                                }
+                                msg += `\n👉 Hướng dẫn: Nhấn "Cấu hình cột" và sửa chữ cái cho đúng nhé!`;
+                                alert(msg);
+                            } else {
+                                setFormData(prev => ({
+                                    ...prev, actual_dt_hr_mwg: hrPassMWG, actual_dt_shop_mwg: matchesMWG,
+                                    actual_dt_hr_oka: hrPassOKA, actual_dt_shop_oka: matchesOKA
+                                }));
+                                setUploadMsgs(prev => ({ ...prev, dt: `✅ Đã xử lý ${matchedRows} dòng thành công!` }));
+                            }
+                        }
+                    } catch (error) {
+                        setUploadMsgs(prev => ({ ...prev, [keyType]: '❌ Lỗi đọc file!' }));
+                        alert("Có lỗi xảy ra khi đọc file Excel. Định dạng file có thể không đúng.");
+                        console.error(error);
+                    }
+                    setUploadKeys(prev => ({ ...prev, [keyType]: prev[keyType] + 1 })); 
+                };
+                reader.readAsArrayBuffer(file); 
+            };
+
+            const calcMetrics = (actualVal, targetVal) => {
+                const actual = Number(actualVal) || 0;
+                const target = Number(targetVal) || 0;
+                // Giữ lại remaining nếu cần dùng cho logic khác, nhưng bỏ khỏi str
+                const remaining = Math.max(0, target - actual);
+                const percent = target > 0 ? ((actual / target) * 100).toFixed(1) : 0;
+                // FORMAT MỚI: Chỉ lấy a / b / %
+                return { actual, target, remaining, percent, str: `${actual}/${target}/${percent}%` };
+            };
+
+            const calcChannelKPI = (actualHR, targetHR, actualShop, targetShop) => {
+                const hrPercent = targetHR > 0 ? (actualHR / targetHR) : (actualHR > 0 ? 1 : 0);
+                const shopPercent = targetShop > 0 ? (actualShop / targetShop) : (actualShop > 0 ? 1 : 0);
+                return (hrPercent * 0.6 + shopPercent * 0.4) * 100;
+            };
+
+            const calculateProgress = () => {
+                const totalFtfShopActual = Number(formData.actual_ftf_shop_mwg) + Number(formData.actual_ftf_shop_oka);
+                const totalFtfShopTarget = Number(formData.target_ftf_shop_mwg) + Number(formData.target_ftf_shop_oka);
+                
+                const ftfProgress = totalFtfShopTarget > 0 ? (totalFtfShopActual / totalFtfShopTarget) * 100 : 0;
+
+                const t_hr_mwg = Number(formData.target_dt_hr_mwg);
+                const t_shop_mwg = Number(formData.target_dt_shop_mwg);
+                const t_hr_oka = Number(formData.target_dt_hr_oka);
+                const t_shop_oka = Number(formData.target_dt_shop_oka);
+
+                const hasMWG = t_hr_mwg > 0 || t_shop_mwg > 0;
+                const hasOKA = t_hr_oka > 0 || t_shop_oka > 0;
+
+                const kpiMWG = hasMWG ? calcChannelKPI(formData.actual_dt_hr_mwg, t_hr_mwg, formData.actual_dt_shop_mwg, t_shop_mwg) : 0;
+                const kpiOKA = hasOKA ? calcChannelKPI(formData.actual_dt_hr_oka, t_hr_oka, formData.actual_dt_shop_oka, t_shop_oka) : 0;
+
+                let dtProgress = 0;
+                if (hasMWG && hasOKA) {
+                    dtProgress = (kpiMWG * 0.5) + (kpiOKA * 0.5);
+                } else if (hasMWG) {
+                    dtProgress = kpiMWG;
+                } else if (hasOKA) {
+                    dtProgress = kpiOKA;
+                }
+
+                return { ftfProgress, dtProgress };
+            };
+
+            const { ftfProgress, dtProgress } = calculateProgress();
+            const isFtfFailed = ftfProgress > 0 && ftfProgress < 16.68;
+            const isDtFailed = dtProgress > 0 && dtProgress < 11.8;
+            const needsReason = isFtfFailed || isDtFailed;
+
+            // XUẤT KẾT QUẢ BÁO CÁO (Lấy đúng Target và Thực tế đã nhập/bốc tách)
+            const generateReportText = () => {
+                const dateParts = formData.ngay.split('-');
+                const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : formData.ngay;
+
+                const mwgShop = calcMetrics(formData.actual_ftf_shop_mwg, formData.target_ftf_shop_mwg);
+                const mwgHr = calcMetrics(formData.actual_ftf_hr_mwg, formData.target_ftf_hr_mwg);
+                const kaShop = calcMetrics(formData.actual_ftf_shop_oka, formData.target_ftf_shop_oka);
+                const kaHr = calcMetrics(formData.actual_ftf_hr_oka, formData.target_ftf_hr_oka);
+                
+                const dtHrMwg = calcMetrics(formData.actual_dt_hr_mwg, formData.target_dt_hr_mwg);
+                const dtTranMwg = calcMetrics(formData.actual_dt_shop_mwg, formData.target_dt_shop_mwg);
+                const dtHrOka = calcMetrics(formData.actual_dt_hr_oka, formData.target_dt_hr_oka);
+                const dtTranOka = calcMetrics(formData.actual_dt_shop_oka, formData.target_dt_shop_oka);
+
+                let report = `Từ hôm nay Anh em báo cáo hoạt động Training FTF và Đấu trường theo form : \n`;
+                const trainerDisplay = formData.trainer ? ` - ${formData.trainer}` : '';
+                report += `Khu vực : ${formData.khuVuc || '[Chưa nhập]'}${trainerDisplay}\n`;
+                report += `Ngày : ${formattedDate}\n\n`;
+
+                report += `✅ FTF :\n`;
+                report += `MWG\n`;
+                report += ` - Số Shop MWG : ${mwgShop.str}\n`;
+                report += ` - Số nhân sự tham gia : ${mwgHr.str}\n`; // Bỏ chữ dư
+                report += `Other KA\n`;
+                report += ` - Số Shop Other KA : ${kaShop.str}\n`;
+                report += ` - Số nhân sự tham gia : ${kaHr.str}\n\n`; // Bỏ chữ dư
+
+                report += `✅ Đấu trường :\n`;
+                report += `MWG\n`;
+                report += ` - Số HR Pass đủ 10 lần : ${dtHrMwg.str}\n`;
+                report += ` - Số trận đấu : ${dtTranMwg.str}\n`;
+                report += `Other KA\n`;
+                report += ` - Số HR Pass đủ 10 lần : ${dtHrOka.str}\n`;
+                report += ` - Số trận đấu : ${dtTranOka.str}\n`;
+
+                if (needsReason) {
+                    report += `\nBên cạnh đó\n`;
+                    report += `Hôm nay không đạt tiến độ FTF : 16.68% và Đấu trường 11.8%\n`;
+                    report += ` - Giải trình tag RM + Leader: ${formData.reason || '[Nhập lý do giải trình]'}\n`;
+                }
+
+                return report;
+            };
+
+            const reportText = generateReportText();
+
+            const copyToClipboard = () => {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(reportText).then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                    });
+                } else {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = reportText;
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                    } catch (err) { }
+                    document.body.removeChild(textArea);
+                }
+            };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-7xl mx-auto">
+                        <header className="mb-8 text-center md:text-left">
+                            <h1 className="text-3xl font-bold text-gray-800 flex items-center justify-center md:justify-start gap-2">
+                                <i data-lucide="clipboard-list" className="w-8 h-8 text-blue-600"></i>
+                                Tool Báo Cáo FTF & Đấu Trường
+                            </h1>
+                            <p className="text-gray-500 mt-2">Xử lý chéo dữ liệu Excel và tự động sinh báo cáo chuẩn (a/b/c/%)</p>
+                        </header>
+
+                        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                            
+                            {/* LEFT COLUMN: INPUTS */}
+                            <div className="xl:col-span-8 space-y-6">
+                                
+                                {/* 1. General Info */}
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                        <i data-lucide="info" className="w-5 h-5 text-blue-500"></i> Thông tin chung
+                                    </h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="md:col-span-1">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Trainer (Bắt buộc)</label>
+                                            <select name="trainer" value={formData.trainer} onChange={handleTrainerSelect} className="w-full px-4 py-2 rounded-lg border border-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white font-medium">
+                                                <option value="">-- Chọn Trainer --</option>
+                                                {TRAINER_DATA.map(t => (
+                                                    <option key={t.trainer} value={t.trainer}>{t.trainer} ({t.khuVuc})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Khu vực</label>
+                                            <input type="text" name="khuVuc" value={formData.khuVuc} onChange={handleChange} placeholder="Tự động điền..." className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày</label>
+                                            <input type="date" name="ngay" value={formData.ngay} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 2. THIẾT LẬP TARGET */}
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-indigo-100">
+                                    <h2 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
+                                        <i data-lucide="target" className="w-5 h-5"></i> Thiết lập Target (Tự động tải theo Trainer)
+                                    </h2>
+                                    <div className="space-y-6">
+                                        <div className="bg-indigo-50/50 rounded-lg p-4 border border-indigo-100">
+                                            <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Target FTF</h3>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm text-left text-gray-500">
+                                                    <thead className="text-xs text-gray-700 uppercase bg-indigo-100 border-b border-indigo-200">
+                                                        <tr>
+                                                            <th className="px-4 py-2 border-r border-indigo-200">Kênh</th>
+                                                            <th className="px-4 py-2 border-r border-indigo-200 text-center">MWG</th>
+                                                            <th className="px-4 py-2 text-center">OKA</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr className="bg-white border-b">
+                                                            <th className="px-4 py-2 font-medium text-gray-900 border-r border-gray-200">Target (Shop)</th>
+                                                            <td className="px-4 py-2 border-r border-gray-200"><input type="number" name="target_ftf_shop_mwg" value={formData.target_ftf_shop_mwg} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-indigo-600"/></td>
+                                                            <td className="px-4 py-2"><input type="number" name="target_ftf_shop_oka" value={formData.target_ftf_shop_oka} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-indigo-600"/></td>
+                                                        </tr>
+                                                        <tr className="bg-white">
+                                                            <th className="px-4 py-2 font-medium text-gray-900 border-r border-gray-200">Target Số nhân sự</th>
+                                                            <td className="px-4 py-2 border-r border-gray-200"><input type="number" name="target_ftf_hr_mwg" value={formData.target_ftf_hr_mwg} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-indigo-600"/></td>
+                                                            <td className="px-4 py-2"><input type="number" name="target_ftf_hr_oka" value={formData.target_ftf_hr_oka} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-indigo-600"/></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div className="bg-orange-50/50 rounded-lg p-4 border border-orange-100">
+                                            <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Target Đấu Trường</h3>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm text-left text-gray-500">
+                                                    <thead className="text-xs text-gray-700 uppercase bg-orange-100 border-b border-orange-200">
+                                                        <tr>
+                                                            <th className="px-4 py-2 border-r border-orange-200">Chỉ số</th>
+                                                            <th className="px-4 py-2 border-r border-orange-200 text-center">MWG</th>
+                                                            <th className="px-4 py-2 text-center">OKA</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr className="bg-white border-b">
+                                                            <th className="px-4 py-2 font-medium text-gray-900 border-r border-gray-200">SL HR từ 10 trận</th>
+                                                            <td className="px-4 py-2 border-r border-gray-200"><input type="number" name="target_dt_hr_mwg" value={formData.target_dt_hr_mwg} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-orange-600"/></td>
+                                                            <td className="px-4 py-2"><input type="number" name="target_dt_hr_oka" value={formData.target_dt_hr_oka} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-orange-600"/></td>
+                                                        </tr>
+                                                        <tr className="bg-white">
+                                                            <th className="px-4 py-2 font-medium text-gray-900 border-r border-gray-200">Tổng Số Trận</th>
+                                                            <td className="px-4 py-2 border-r border-gray-200"><input type="number" name="target_dt_shop_mwg" value={formData.target_dt_shop_mwg} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-orange-600"/></td>
+                                                            <td className="px-4 py-2"><input type="number" name="target_dt_shop_oka" value={formData.target_dt_shop_oka} onChange={handleChange} className="w-full bg-transparent outline-none text-center font-semibold text-orange-600"/></td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 3. BƯỚC 1: UPLOAD DANH SÁCH SHOP (MASTER) */}
+                                <div className="bg-purple-50 p-6 rounded-xl shadow-sm border border-purple-200 relative overflow-hidden">
+                                    <div className="flex justify-between items-center mb-4 relative z-10">
+                                        <h2 className="text-lg font-semibold text-purple-800 flex items-center gap-2">
+                                            <i data-lucide="database" className="w-5 h-5"></i> Bước 1: Tải Danh sách Shop (Dùng để lọc)
+                                        </h2>
+                                        <button onClick={() => setShowSettingsMaster(!showSettingsMaster)} className="text-sm bg-white px-2 py-1 rounded border border-purple-300 text-purple-600 hover:text-purple-800 flex items-center gap-1 font-medium transition shadow-sm">
+                                            <i data-lucide="settings-2" className="w-4 h-4"></i> Cấu hình cột
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="mb-4 relative z-10">
+                                        <p className="text-sm text-purple-700 mb-3">Tải file danh sách có chứa <b>Mã Shop</b>, <b>Tên Trainer</b> và <b>Kênh</b>. Hệ thống sẽ lọc ra các Mã Shop của Trainer bạn chọn.</p>
+                                        <input key={uploadKeys.master} type="file" accept=".xlsx, .xls, .csv" onChange={handleMasterUpload} className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer transition-colors border border-purple-200 rounded-lg bg-white shadow-sm"/>
+                                        {uploadMsgs.master && <div className={`mt-2 text-sm font-bold ${uploadMsgs.master.includes('❌') ? 'text-red-600' : (uploadMsgs.master.includes('✅') ? 'text-green-600' : 'text-purple-700')}`}>{uploadMsgs.master}</div>}
+                                    </div>
+
+                                    {showSettingsMaster && (
+                                        <div className="bg-white p-4 rounded-lg border border-purple-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4 shadow-sm relative z-10">
+                                            <div>
+                                                <label className="block text-gray-600 mb-1 font-medium">Cột Mã Shop</label>
+                                                <input type="text" value={configMaster.shop} onChange={e => handleColChange('master', 'shop', e.target.value)} className="w-full border border-purple-200 rounded px-2 py-1.5 uppercase font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-600 mb-1 font-medium">Cột Tên Trainer</label>
+                                                <input type="text" value={configMaster.trainer} onChange={e => handleColChange('master', 'trainer', e.target.value)} className="w-full border border-purple-200 rounded px-2 py-1.5 uppercase font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-600 mb-1 font-medium">Cột Tên Shop (Để lọc Kênh)</label>
+                                                <input type="text" value={configMaster.channel} onChange={e => handleColChange('master', 'channel', e.target.value)} className="w-full border border-purple-200 rounded px-2 py-1.5 uppercase font-bold text-purple-700 focus:ring-2 focus:ring-purple-500 outline-none" />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {Object.keys(managedShops).length > 0 && (
+                                        <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-sm flex items-center gap-2 mt-2 shadow-sm relative z-10">
+                                            <i data-lucide="check-circle" className="w-5 h-5 flex-shrink-0 text-green-600"></i>
+                                            <span>Tuyệt vời! Đã ghi nhận <b>{Object.keys(managedShops).length}</b> Mã Shop thuộc quản lý của <b>{formData.trainer}</b>. Vui lòng làm Bước 2!</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* 4. BƯỚC 2: NHẬP DỮ LIỆU THỰC TẾ (CÓ UPLOAD EXCEL RAW) */}
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
+                                        Bước 2: Nạp Dữ Liệu Thực Tế
+                                    </h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        
+                                        {/* FTF Actuals */}
+                                        <div className="bg-white p-5 rounded-xl shadow-sm border border-blue-100 flex flex-col">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h2 className="text-lg font-semibold text-blue-700 flex items-center gap-2">
+                                                    <i data-lucide="users" className="w-5 h-5"></i> Thực tế FTF
+                                                </h2>
+                                                <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full border border-blue-200">
+                                                    Tiến độ: {ftfProgress.toFixed(1)}%
+                                                </span>
+                                            </div>
+
+                                            <div className="mb-6 bg-blue-50/50 border border-blue-200 rounded-lg p-4">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <label className="text-xs font-bold text-blue-900 uppercase tracking-wide flex items-center gap-1">
+                                                        <i data-lucide="file-spreadsheet" className="w-4 h-4 text-blue-600"></i> Auto Bốc tách FTF
+                                                    </label>
+                                                    <button onClick={() => setShowSettingsFtf(!showSettingsFtf)} className="text-[11px] bg-white border border-blue-300 px-2 py-1 rounded text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium transition shadow-sm">
+                                                        <i data-lucide="settings-2" className="w-3 h-3"></i> Cấu hình
+                                                    </button>
+                                                </div>
+                                                <input key={uploadKeys.ftf} type="file" accept=".xlsx, .xls, .csv" onChange={(e) => handleRawUpload(e, 'FTF')} className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer transition-colors border border-blue-200 rounded bg-white shadow-sm"/>
+                                                {uploadMsgs.ftf && <div className={`mt-2 text-sm font-bold ${uploadMsgs.ftf.includes('❌') ? 'text-red-600' : (uploadMsgs.ftf.includes('✅') ? 'text-green-600' : 'text-blue-700')}`}>{uploadMsgs.ftf}</div>}
+
+                                                {showSettingsFtf && (
+                                                    <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] bg-white p-2 rounded border border-blue-100">
+                                                        <div>
+                                                            <label className="block text-gray-500 mb-1 text-center">Cột Mã Shop</label>
+                                                            <input type="text" value={configFtfRaw.shop} onChange={e => handleColChange('ftf', 'shop', e.target.value)} className="w-full border border-blue-200 rounded px-1 py-1 uppercase text-center font-bold text-blue-700 focus:ring-1 focus:ring-blue-500 outline-none" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-gray-500 mb-1 text-center">Cột Số Đã Train</label>
+                                                            <input type="text" value={configFtfRaw.hr} onChange={e => handleColChange('ftf', 'hr', e.target.value)} className="w-full border border-blue-200 rounded px-1 py-1 uppercase text-center font-bold text-blue-700 focus:ring-1 focus:ring-blue-500 outline-none" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-gray-500 mb-1 text-center">Cột Trạng Thái</label>
+                                                            <input type="text" value={configFtfRaw.status} onChange={e => handleColChange('ftf', 'status', e.target.value)} placeholder="Trống nếu k có" className="w-full border border-blue-200 rounded px-1 py-1 uppercase text-center font-bold text-blue-700 focus:ring-1 focus:ring-blue-500 outline-none" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="mb-4">
+                                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Hệ thống MWG</h3>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">Số Shop Thực tế</label>
+                                                        <input type="number" name="actual_ftf_shop_mwg" value={formData.actual_ftf_shop_mwg} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-blue-500 outline-none"/>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">Số NS Thực tế</label>
+                                                        <input type="number" name="actual_ftf_hr_mwg" value={formData.actual_ftf_hr_mwg} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-blue-500 outline-none"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Hệ thống Other KA</h3>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">Số Shop Thực tế</label>
+                                                        <input type="number" name="actual_ftf_shop_oka" value={formData.actual_ftf_shop_oka} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-blue-500 outline-none"/>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">Số NS Thực tế</label>
+                                                        <input type="number" name="actual_ftf_hr_oka" value={formData.actual_ftf_hr_oka} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-blue-500 outline-none"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Đấu Trường Actuals */}
+                                        <div className="bg-white p-5 rounded-xl shadow-sm border border-orange-100 flex flex-col">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h2 className="text-lg font-semibold text-orange-600 flex items-center gap-2">
+                                                    <i data-lucide="swords" className="w-5 h-5"></i> TT Đấu trường
+                                                </h2>
+                                                <span className="text-xs font-medium bg-orange-100 text-orange-800 px-2 py-1 rounded-full border border-orange-200">
+                                                    KPI: {dtProgress.toFixed(1)}%
+                                                </span>
+                                            </div>
+
+                                            <div className="mb-6 bg-orange-50/50 border border-orange-200 rounded-lg p-4">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <label className="text-xs font-bold text-orange-900 uppercase tracking-wide flex items-center gap-1">
+                                                        <i data-lucide="file-spreadsheet" className="w-4 h-4 text-orange-600"></i> Auto Bốc tách DT
+                                                    </label>
+                                                    <button onClick={() => setShowSettingsDt(!showSettingsDt)} className="text-[11px] bg-white border border-orange-300 px-2 py-1 rounded text-orange-600 hover:text-orange-800 flex items-center gap-1 font-medium transition shadow-sm">
+                                                        <i data-lucide="settings-2" className="w-3 h-3"></i> Cấu hình
+                                                    </button>
+                                                </div>
+                                                <input key={uploadKeys.dt} type="file" accept=".xlsx, .xls, .csv" onChange={(e) => handleRawUpload(e, 'DT')} className="block w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-orange-600 file:text-white hover:file:bg-orange-700 cursor-pointer transition-colors border border-orange-200 rounded bg-white shadow-sm"/>
+                                                {uploadMsgs.dt && <div className={`mt-2 text-sm font-bold ${uploadMsgs.dt.includes('❌') ? 'text-red-600' : (uploadMsgs.dt.includes('✅') ? 'text-green-600' : 'text-orange-700')}`}>{uploadMsgs.dt}</div>}
+
+                                                {showSettingsDt && (
+                                                    <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] bg-white p-2 rounded border border-orange-100">
+                                                        <div>
+                                                            <label className="block text-gray-500 mb-1 text-center">Cột Mã Shop</label>
+                                                            <input type="text" value={configDtRaw.shop} onChange={e => handleColChange('dt', 'shop', e.target.value)} className="w-full border border-orange-200 rounded px-1 py-1 uppercase text-center font-bold text-orange-700 focus:ring-1 focus:ring-orange-500 outline-none" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-gray-500 mb-1 text-center">Cột Tên Shop</label>
+                                                            <input type="text" value={configDtRaw.shopName} onChange={e => handleColChange('dt', 'shopName', e.target.value)} className="w-full border border-orange-200 rounded px-1 py-1 uppercase text-center font-bold text-orange-700 focus:ring-1 focus:ring-orange-500 outline-none" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-gray-500 mb-1 text-center">Cột Sum Trận</label>
+                                                            <input type="text" value={configDtRaw.matches} onChange={e => handleColChange('dt', 'matches', e.target.value)} className="w-full border border-orange-200 rounded px-1 py-1 uppercase text-center font-bold text-orange-700 focus:ring-1 focus:ring-orange-500 outline-none" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-gray-500 mb-1 text-center">Cột Trainer</label>
+                                                            <input type="text" value={configDtRaw.trainer} onChange={e => handleColChange('dt', 'trainer', e.target.value)} placeholder="Trống = Bỏ qua" className="w-full border border-orange-200 rounded px-1 py-1 uppercase text-center font-bold text-orange-700 focus:ring-1 focus:ring-orange-500 outline-none" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="mb-4">
+                                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Kênh MWG</h3>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">SL HR ≥ 10 trận</label>
+                                                        <input type="number" name="actual_dt_hr_mwg" value={formData.actual_dt_hr_mwg} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-orange-500 outline-none"/>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">Số Trận đấu</label>
+                                                        <input type="number" name="actual_dt_shop_mwg" value={formData.actual_dt_shop_mwg} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-orange-500 outline-none"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-gray-700 mb-2">Kênh Other KA</h3>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">SL HR ≥ 10 trận</label>
+                                                        <input type="number" name="actual_dt_hr_oka" value={formData.actual_dt_hr_oka} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-orange-500 outline-none"/>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">Số Trận đấu</label>
+                                                        <input type="number" name="actual_dt_shop_oka" value={formData.actual_dt_shop_oka} onChange={handleChange} className="w-full px-3 py-1.5 text-sm rounded border border-gray-300 focus:border-orange-500 outline-none"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 5. Reason Section (Conditional) */}
+                                {needsReason && (
+                                    <div className="bg-red-50 p-6 rounded-xl shadow-sm border border-red-200 animate-[pulse_2s_ease-in-out_1]">
+                                        <h2 className="text-lg font-semibold text-red-700 mb-2 flex items-center gap-2">
+                                            <i data-lucide="alert-triangle" className="w-5 h-5"></i> Yêu cầu giải trình
+                                        </h2>
+                                        <p className="text-sm text-red-600 mb-3">
+                                            Tiến độ hiện tại đang dưới mức quy định (FTF: {ftfProgress.toFixed(1)}% / 16.68%, Đấu trường: {dtProgress.toFixed(1)}% / 11.8%). Vui lòng nhập lý do.
+                                        </p>
+                                        <textarea 
+                                            name="reason" 
+                                            value={formData.reason} 
+                                            onChange={handleChange} 
+                                            placeholder="Nhập lý do không đạt tiến độ vào đây..." 
+                                            rows="3"
+                                            className="w-full px-4 py-2 rounded-lg border border-red-300 focus:ring-2 focus:ring-red-500 outline-none transition-all resize-none"
+                                        />
+                                    </div>
+                                )}
+
+                            </div>
+
+                            {/* RIGHT COLUMN: PREVIEW & COPY */}
+                            <div className="xl:col-span-4 relative">
+                                <div className="sticky top-8 bg-gray-800 rounded-xl shadow-xl overflow-hidden flex flex-col h-auto xl:h-[calc(100vh-6rem)]">
+                                    <div className="bg-gray-900 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex gap-1.5">
+                                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                            </div>
+                                            <span className="text-gray-300 text-sm font-medium ml-2">Kết quả báo cáo</span>
+                                        </div>
+                                        <button 
+                                            onClick={copyToClipboard}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${
+                                                copied ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'
+                                            }`}
+                                        >
+                                            {copied ? (
+                                                <><i data-lucide="check" className="w-4 h-4"></i> Đã Copy</>
+                                            ) : (
+                                                <><i data-lucide="copy" className="w-4 h-4"></i> Copy</>
+                                            )}
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="p-6 overflow-y-auto flex-1 bg-gray-800">
+                                        <pre className="text-gray-100 font-mono text-sm whitespace-pre-wrap leading-relaxed">
+                                            {reportText}
+                                        </pre>
+                                    </div>
+                                    
+                                    <div className="bg-gray-900 px-4 py-3 border-t border-gray-700 text-xs text-gray-400 text-center">
+                                        Định dạng: Thực hiện / Mục tiêu / Tỷ lệ %
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
